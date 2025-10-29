@@ -32,7 +32,7 @@ resource "aws_iam_role" "tfc_runner" {
         Action = "sts:AssumeRoleWithWebIdentity",
         Condition = {
           StringEquals = {
-            "app.terraform.io:aud" = "aws"
+            "app.terraform.io:aud": "aws.workload.identity"
           },
           # Allow one or many subjects (org/project/workspace) using ForAnyValue:StringLike
           "ForAnyValue:StringLike" = {
