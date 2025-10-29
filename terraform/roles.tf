@@ -10,38 +10,53 @@ locals {
 ############################
 # OIDC provider for TFC
 ############################
+data "tls_certificate" "provider" {
+  url = "https://app.terraform.io"
+}
+
 resource "aws_iam_openid_connect_provider" "tfc" {
-  url             = "https://app.terraform.io"
-  client_id_list  = ["aws"]                           # Terraform Cloud sets aud=aws
+  url = "https://app.terraform.io"
+
+  client_id_list = [
+    "aws.workload.identity", # Default audience in HCP Terraform for AWS.
+  ]
+
+  thumbprint_list = [
+    data.tls_certificate.provider.certificates[0].sha1_fingerprint,
+  ]
 }
 
 ############################
 # IAM role TFC will assume (via OIDC)
 ############################
+data "aws_iam_policy_document" "tfc_runner_assume_role_policy" {
+  statement {
+    effect = "Allow"
+
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.tfc.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "app.terraform.io:aud"
+      values   = ["aws.workload.identity"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "app.terraform.io:sub"
+      values   = ["organization:${local.tfc_org}:project:*:workspace:*:run_phase:*"]
+    }
+  }
+}
+
 resource "aws_iam_role" "tfc_runner" {
   name = "terraform-cloud-deploy-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.tfc.arn
-        },
-        Action = "sts:AssumeRoleWithWebIdentity",
-        Condition = {
-          StringEquals = {
-            "app.terraform.io:aud": "aws.workload.identity"
-          },
-          # Allow one or many subjects (org/project/workspace) using ForAnyValue:StringLike
-          "StringLike" = {
-            "app.terraform.io:sub" = "organization:${local.tfc_org}:project:*:workspace:*:run_phase:*"
-          }
-        }
-      }
-    ]
-  })
+  assume_role_policy = data.aws_iam_policy_document.tfc_runner_assume_role_policy.json
 }
 
 ############################
