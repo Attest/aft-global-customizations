@@ -4,7 +4,7 @@ terraform {
 }
 
 locals {
-  tfc_org = "epo-attest-test"
+  tfc_org = "askattest"
 }
 
 ############################
