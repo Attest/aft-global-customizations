@@ -5,6 +5,7 @@ terraform {
 
 locals {
   tfc_org = "askattest"
+  gha_org = "Attest"
 }
 
 ############################
@@ -60,6 +61,51 @@ resource "aws_iam_role" "tfc_runner" {
 }
 
 ############################
+# OIDC provider for GHA
+############################
+resource "aws_iam_openid_connect_provider" "gha" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = [
+    "sts.amazonaws.com",
+  ]
+}
+
+############################
+# IAM role GHA will assume (via OIDC)
+############################
+data "aws_iam_policy_document" "gha_runner" {
+  statement {
+    effect = "Allow"
+
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.gha.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${local.gha_org}/*"]
+    }
+  }
+}
+
+resource "aws_iam_role" "gha_runner" {
+  name = "github-actions-deploy-role"
+  assume_role_policy = data.aws_iam_policy_document.gha_runner.json
+}
+
+
+############################
 # Permissions for the role
 # - bootstrap with AdministratorAccess (simple)
 ############################
@@ -68,4 +114,9 @@ resource "aws_iam_role" "tfc_runner" {
 resource "aws_iam_role_policy_attachment" "admin" {
   role       = aws_iam_role.tfc_runner.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "gha_runner" {
+  role       = aws_iam_role.gha_runner.name
+  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
 }
