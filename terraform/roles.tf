@@ -67,14 +67,14 @@ resource "aws_iam_openid_connect_provider" "gha" {
   url = "https://token.actions.githubusercontent.com"
 
   client_id_list = [
-    "sts.amazonaws.com", # Default audience in HCP Terraform for AWS.
+    "sts.amazonaws.com",
   ]
 }
 
 ############################
 # IAM role GHA will assume (via OIDC)
 ############################
-data "aws_iam_policy_document" "gha_runner_assume_role_policy" {
+data "aws_iam_policy_document" "gha_runner" {
   statement {
     effect = "Allow"
 
@@ -101,7 +101,7 @@ data "aws_iam_policy_document" "gha_runner_assume_role_policy" {
 
 resource "aws_iam_role" "gha_runner" {
   name = "github-actions-deploy-role"
-  assume_role_policy = data.aws_iam_policy_document.gha_runner_assume_role_policy.json
+  assume_role_policy = data.aws_iam_policy_document.gha_runner.json
 }
 
 
@@ -116,7 +116,7 @@ resource "aws_iam_role_policy_attachment" "admin" {
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "admin_gha" {
+resource "aws_iam_role_policy_attachment" "gha_runner" {
   role       = aws_iam_role.gha_runner.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
 }
