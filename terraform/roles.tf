@@ -56,7 +56,7 @@ data "aws_iam_policy_document" "tfc_runner_assume_role_policy" {
 }
 
 resource "aws_iam_role" "tfc_runner" {
-  name               = "terraform-cloud-deploy-role"
+  name = "terraform-cloud-deploy-role"
   assume_role_policy = data.aws_iam_policy_document.tfc_runner_assume_role_policy.json
 }
 
@@ -100,7 +100,7 @@ data "aws_iam_policy_document" "gha_runner" {
 }
 
 resource "aws_iam_role" "gha_runner" {
-  name               = "github-actions-deploy-role"
+  name = "github-actions-deploy-role"
   assume_role_policy = data.aws_iam_policy_document.gha_runner.json
 }
 
