@@ -8,7 +8,10 @@ provider "aws" {
   }
   default_tags {
     tags = {
-      managed_by                  = "AFT"
+      Application                 = "AFT"
+      ManagedBy                   = "AFT-Terraform"
+      gitRepo                     = "aft-global-customizations"
+      Owner                       = "Platform"
     }
   }
 }
