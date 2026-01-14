@@ -1,7 +1,8 @@
 locals {
   # set name prefix (via bucket application var) to be the account alias (passed in as a custom field in the account request modules)
   # this ensures all buckets created in the account have a unique name across all AWS accounts
-  bucket_application = data.aws_ssm_parameter.alias.value
+  # example: aft-dr (full bucket: attest-aft-dr-s3-access-logs-a102) when the account alias is attest-ct-dr
+  bucket_application = "aft-${trimprefix(data.aws_ssm_parameter.alias.value, "attest-ct-")}"
 }
 
 # S3 access logs bucket
