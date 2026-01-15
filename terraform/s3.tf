@@ -8,10 +8,12 @@ locals {
 # S3 access logs bucket
 module "s3_access_logs_bucket" {
   source  = "app.terraform.io/askattest/s3-bucket/aws"
-  version = "~> 0.3"
+  version = "~> 0.4"
 
-  name        = "s3-access-logs"
-  application = local.bucket_application
+  name                                            = "s3-access-logs"
+  application                                     = local.bucket_application
+  attach_access_log_delivery_policy               = true
+  access_log_delivery_policy_source_organizations = [data.aws_organizations_organization.current.id]
 
   enable_access_logs = false # this is the logging bucket itself, so disable logging to avoid circular logging
 }
@@ -19,7 +21,7 @@ module "s3_access_logs_bucket" {
 # VPC flow logs bucket
 module "s3_vpc_flow_logs_bucket" {
   source  = "app.terraform.io/askattest/s3-bucket/aws"
-  version = "~> 0.3"
+  version = "~> 0.4"
 
   name        = "vpc-flow-logs"
   application = local.bucket_application
@@ -32,7 +34,7 @@ module "s3_vpc_flow_logs_bucket" {
 # Load balancer access logs bucket
 module "s3_lb_access_logs_bucket" {
   source  = "app.terraform.io/askattest/s3-bucket/aws"
-  version = "~> 0.3"
+  version = "~> 0.4"
 
   name        = "lb-access-logs"
   application = local.bucket_application
@@ -40,4 +42,7 @@ module "s3_lb_access_logs_bucket" {
     target_bucket = module.s3_access_logs_bucket.bucket_id
     target_prefix = "lb-access-logs/"
   }
+  attach_lb_log_delivery_policy               = true
+  attach_elb_log_delivery_policy              = true
+  lb_log_delivery_policy_source_organizations = [data.aws_organizations_organization.current.id]
 }
