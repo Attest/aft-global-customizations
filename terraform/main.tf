@@ -18,3 +18,9 @@ resource "aws_s3_account_public_access_block" "s3_public_access_block" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# EC2 Spot service-linked role - required for Karpenter to provision spot instances
+resource "aws_iam_service_linked_role" "spot" {
+  aws_service_name = "spot.amazonaws.com"
+  description      = "Service-linked role for EC2 Spot Instances"
+}
