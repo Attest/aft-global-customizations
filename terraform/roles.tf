@@ -6,6 +6,12 @@ terraform {
 locals {
   tfc_org = "askattest"
   gha_org = "Attest"
+  # Attest's immutable GitHub org id. GitHub embeds owner_id/repo_id in the OIDC
+  # `sub` claim for all repos created (or renamed/transferred) after 2026-07-15
+  # ("immutable subject claims"), producing `repo:Attest@13132697/<repo>@<id>:...`
+  # instead of the legacy `repo:Attest/<repo>:...`. The org id never changes, so
+  # anchoring the trust policy on it is safe against org-name recycling.
+  gha_org_id = "13132697"
 }
 
 ############################
@@ -94,7 +100,10 @@ data "aws_iam_policy_document" "gha_runner" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.gha_org}/*"]
+      values = [
+        "repo:${local.gha_org}/*",                     # legacy mutable subject (repos created <= 2026-07-15)
+        "repo:${local.gha_org}@${local.gha_org_id}/*", # immutable subject (repos created after 2026-07-15)
+      ]
     }
   }
 }
