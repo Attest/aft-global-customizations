@@ -1,54 +1,52 @@
-# Learn Terraform - Use Control Tower Account Factory for Terraform
+# aft-global-customizations
 
-This is a companion repository for the Hashicorp [Provision and Manage Accounts with
-Control Tower Account Factory for Terraform
-tutorial](https://developer.hashicorp.com/terraform/tutorials/aws/aws-control-tower-aft).
+AFT (Account Factory for Terraform) global customizations for the `askattest` organization. These Terraform resources are applied to **every** AWS account provisioned through AFT.
 
-This repository contains boilerplate configuration for defining global
-customizations to use with the Account Factory for Terraform
-module. The README below and the template files in this repository were
-provided by AWS.
+## What This Repo Does
 
-To create your global customizations, replicate this repository
-and extend the Terraform configuration.
+Applies the following baseline to each account:
 
-## Introduction
-This repo stores the Terraform and API helpers for the Global Customizations. Global Customizations are used to customize all provisioned accounts with customer defined resources. The resources can be created through Terraform or through Python, leveraging the API helpers. The customization run is parameterized at runtime.
+- **Account alias** -- set from the AFT account request custom field in SSM
+- **EBS encryption by default** -- all new EBS volumes are encrypted
+- **S3 account public access block** -- prevents any bucket from being made public
+- **OIDC IAM roles** -- `terraform-cloud-deploy-role` (TFC) and `github-actions-deploy-role` (GHA)
+- **Logging S3 buckets** -- s3-access-logs, vpc-flow-logs, lb-access-logs
+
+## Prerequisites
+
+Install tooling via [mise](https://mise.jdx.dev/):
+
+```bash
+mise install
+```
+
+This installs Terraform, tflint, Trivy, terraform-docs, Python, and pre-commit as specified in `mise.toml`.
 
 ## Usage
-To leverage Global Customizations, populate this repo as per the instructions below.
+
+Edit Terraform files under `terraform/`, then validate:
+
+```bash
+mise run precommit
+```
+
+AFT automatically applies changes to all managed accounts on merge to `main`.
 
 ### Terraform
-AFT provides Jinja templates for Terraform backend and providers. These render at the time Terraform is applied. If needed, additional providers can be defined by creating a providers.tf file.
 
-To create Terraform resources, provide your own Terraform files (ex. main.tf, variables.tf, etc) with the resources you would like to create, placing them in the 'terraform' directory.
+Place `.tf` files in the `terraform/` directory. AFT renders `aft-providers.jinja` and `backend.jinja` at runtime to configure the provider and backend.
 
 ### API Helpers
-The purpose of API helpers is to perform actions that cannot be performed within Terraform.
 
-#### Python
-The api_helpers/python folder contains a requirements.txt, where you can specify libraries/packages to be installed via PIP.
+- `api_helpers/pre-api-helpers.sh` -- runs before `terraform apply`
+- `api_helpers/post-api-helpers.sh` -- runs after `terraform apply`
+- `api_helpers/python/requirements.txt` -- Python dependencies installed via pip
 
-#### Bash
-This is where you define what runs before/after Terraform, as well as the order the Python scripts execute, along with any command line parameters. These bash scripts can be extended to perform other actions, such as leveraging the AWS CLI or performing additional/custom Bash scripting.
+## Documentation
 
-- pre-api-helpers.sh - Actions to execute prior to running Terraform.
-- post-api-helpers.sh - Actions to execute after running Terraform.
+- [AGENTS.md](AGENTS.md) -- AI agent instructions, tech stack, commands, and conventions
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) -- Architecture overview with Mermaid diagrams
 
-#### Sample api-helpers.sh
+## License
 
-Sample #1 - Using AWS CLI to query for resources, save to a variable, and then pass to a script. In the example below, all running instances are queried, stopped, and started using AWS CLI and custom Python scritpts.
-```
-instances=$(aws ec2 describe-instances --filters "Name=instance-state-name,Values=running")
-python ./python/source/stop_instances.py --instances $instances
-sleep 10s
-python ./python/source/start_instances.py --instances $instances
-```
-
-Sample #2 - Query a 3rd party IPAM solution, and save the given CIDR to AWS Parameter Store. This SSM parameter could be leveraged from Terraform using a data object to create a VPC.
-```
-account = $(aws sts get-caller-identity --query Account --output text)
-region = $(aws ec2 describe-availability-zones --query 'AvailabilityZones[0].[RegionName]' --output text)
-cidr = $(python ./python/source/get_cidr_range.py)
-aws ssm put-parameter --name /$account/$region/vpc/cidr --value $cidr
-```
+Mozilla Public License 2.0 -- see [LICENSE](LICENSE).
