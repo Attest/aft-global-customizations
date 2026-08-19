@@ -62,8 +62,7 @@ module "s3_lb_access_logs_bucket" {
 # pass name_suffix_seed, which is the module's own mechanism for this: a non-null
 # seed makes it fold the account ID and region into the name-suffix hash. The
 # literal name therefore matches its eu-west-1 counterpart and only the 4-char
-# suffix differs. The seed itself is a constant -- account and region are what do
-# the discriminating.
+# suffix differs.
 #
 # Consequence worth knowing: a seeded suffix is not derivable from the bucket name
 # alone, so a consumer in another repo has to be given the full name rather than
@@ -75,10 +74,14 @@ module "s3_lb_access_logs_bucket" {
 # ---------------------------------------------------------------------------
 
 locals {
-  # Constant. name_suffix_seed's purpose here is only to be non-null, which is what
-  # switches the module from its legacy name-only hash to one that folds in account
-  # ID and region.
-  eu_west_2_suffix_seed = "log-destination"
+  # e.g. "aft-dr-eu-west-2". Passing a non-null name_suffix_seed is what switches the
+  # module from its legacy name-only hash to one that folds in account ID and region,
+  # so uniqueness does not depend on what we put here. Naming the seed after the
+  # application and region anyway keeps these bucket names independent of that
+  # internal behaviour instead of relying on it, and makes adding a second region a
+  # copy-paste. The region is a literal because data.aws_region under the default
+  # provider would resolve to the account's home region, not this one.
+  eu_west_2_suffix_seed = "${local.bucket_application}-eu-west-2"
 }
 
 module "s3_access_logs_bucket_eu_west_2" {
