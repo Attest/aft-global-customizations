@@ -15,3 +15,23 @@ provider "aws" {
     }
   }
 }
+
+## eu-west-2 is the organisation's DR region. AFT only ever generates a provider for
+## the account's home region, so anything that has to exist in eu-west-2 -- today the
+## log destination buckets, since S3 access logging requires the target bucket to be
+## in the same Region as the source -- needs this alias to reach it.
+provider "aws" {
+  alias  = "eu_west_2"
+  region = "eu-west-2"
+  assume_role {
+    role_arn    = "{{ target_admin_role_arn }}"
+  }
+  default_tags {
+    tags = {
+      Application                 = "AFT"
+      ManagedBy                   = "AFT-Terraform"
+      gitRepo                     = "aft-global-customizations"
+      Owner                       = "Platform"
+    }
+  }
+}
