@@ -1,3 +1,36 @@
+# ---------------------------------------------------------------------------
+# Alias ordering -- why every module below carries depends_on.
+#
+# askattest/s3-bucket/aws reads `data "aws_iam_account_alias" "current" {}`
+# internally (its main.tf:43). `aws_iam_account_alias.alias` in main.tf is what
+# CREATES that alias, from the SSM parameter AFT writes out of the account
+# request's `custom_fields.account_alias`. Nothing ordered the read after the
+# write, and a data source is evaluated during PLAN, so on an account whose
+# alias does not exist yet the plan dies with
+#
+#   Error: reading IAM Account Alias: empty result
+#
+# before the alias can ever be created -- a deadlock no re-run escapes.
+# MEASURED 2026-08-25 on `audit` (552533871415) and `security` (215600395829),
+# the two Control Tower core accounts, six errors per run. The six accounts AFT
+# provisioned earlier are unaffected only because their aliases predate this
+# coupling, so the defect stayed hidden until an account was bootstrapped from
+# scratch.
+#
+# depends_on on the module call defers everything inside it, data sources
+# included, until the alias exists. It is INERT wherever the alias is already
+# there: with no pending change on aws_iam_account_alias.alias, Terraform reads
+# the data sources at plan time exactly as before, so the eight established
+# accounts see an identical plan. The cost is only that on a first-ever run for
+# a new account the bucket names are unknown until apply, which for a
+# create-everything plan changes nothing that matters.
+#
+# The narrower fix belongs in askattest/s3-bucket/aws -- taking the alias as an
+# optional input instead of reading it unconditionally -- and would also let the
+# two `enable_access_logs = false` workarounds further down come out. That is a
+# module release; this is the fix available in one repo.
+# ---------------------------------------------------------------------------
+
 locals {
   # set name prefix (via bucket application var) to be the account alias (passed in as a custom field in the account request modules)
   # this ensures all buckets created in the account have a unique name across all AWS accounts
@@ -16,6 +49,9 @@ module "s3_access_logs_bucket" {
   access_log_delivery_policy_source_organizations = [data.aws_organizations_organization.current.id]
 
   enable_access_logs = false # this is the logging bucket itself, so disable logging to avoid circular logging
+
+  # See "Alias ordering" at the top of this file.
+  depends_on = [aws_iam_account_alias.alias]
 }
 
 # VPC flow logs bucket
@@ -29,6 +65,9 @@ module "s3_vpc_flow_logs_bucket" {
     target_bucket = module.s3_access_logs_bucket.bucket_id
     target_prefix = "vpc-flow-logs/"
   }
+
+  # See "Alias ordering" at the top of this file.
+  depends_on = [aws_iam_account_alias.alias]
 }
 
 # Load balancer access logs bucket
@@ -45,6 +84,9 @@ module "s3_lb_access_logs_bucket" {
   attach_lb_log_delivery_policy               = true
   attach_elb_log_delivery_policy              = true
   lb_log_delivery_policy_source_organizations = [data.aws_organizations_organization.current.id]
+
+  # See "Alias ordering" at the top of this file.
+  depends_on = [aws_iam_account_alias.alias]
 }
 
 # ---------------------------------------------------------------------------
@@ -96,6 +138,9 @@ module "s3_access_logs_bucket_eu_west_2" {
   access_log_delivery_policy_source_organizations = [data.aws_organizations_organization.current.id]
 
   enable_access_logs = false # this is the logging bucket itself, so disable logging to avoid circular logging
+
+  # See "Alias ordering" at the top of this file.
+  depends_on = [aws_iam_account_alias.alias]
 }
 
 # VPC flow logs bucket for eu-west-2. Consumed by vpc/dr in
@@ -122,6 +167,9 @@ module "s3_vpc_flow_logs_bucket_eu_west_2" {
     target_prefix = "vpc-flow-logs/"
   }
   enable_access_logs = false
+
+  # See "Alias ordering" at the top of this file.
+  depends_on = [aws_iam_account_alias.alias]
 }
 
 # Load balancer access logs bucket for eu-west-2. A DR rebuild serves traffic, which
@@ -145,4 +193,7 @@ module "s3_lb_access_logs_bucket_eu_west_2" {
   attach_lb_log_delivery_policy               = true
   attach_elb_log_delivery_policy              = true
   lb_log_delivery_policy_source_organizations = [data.aws_organizations_organization.current.id]
+
+  # See "Alias ordering" at the top of this file.
+  depends_on = [aws_iam_account_alias.alias]
 }
